@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Uzay Üssü Komutanı</title><link rel="manifest" href="manifest.json"><link rel="icon" href="icon.svg"><meta name="theme-color" content="#0e1120">
+<style>
+:root{--bg:#f4f5f8;--card:#fff;--tx:#14182b;--mu:#5d6480;--bd:#d9dcea;--ac:#d9531e;--ok:#2e9e5b;--wa:#e0a31b;--bad:#d03b3b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1120;--card:#171b31;--tx:#e8eaf6;--mu:#98a0c4;--bd:#2a3054;--ac:#ff7a45;color-scheme:dark}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:auto;padding:14px}
+h1{font-size:22px;margin:4px 0}h2{font-size:15px;margin:0 0 8px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px}
+.grid{display:grid;gap:10px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:700px){.g2,.g3{grid-template-columns:1fr}}
+button{font:inherit;cursor:pointer;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:8px;padding:8px 10px;text-align:left}
+button:hover:not(:disabled){border-color:var(--ac)}button:disabled{opacity:.45;cursor:not-allowed}
+.pri{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:600;text-align:center}
+.bar{height:10px;background:var(--bd);border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;transition:width .3s}
+.row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px}
+.mu{color:var(--mu);font-size:13px}
+#log{max-height:200px;overflow:auto;font-size:13px}#log p{margin:4px 0;border-bottom:1px solid var(--bd);padding-bottom:4px}
+.tip{border-left:4px solid var(--ac);padding-left:10px;font-size:14px}
+.bad{color:var(--bad)}.ok{color:var(--ok)}
+.wrap{overflow-x:auto}
+</style></head><body><main id="app"></main>
+<script>
+const B={
+ moon:{n:"Ay",sun:0,dose:1.6,info:"Ay’da gündüz ve gece ~14’er Dünya günü sürer: gece boyunca güneş paneli çalışmaz. Atmosfer ve manyetik alan yoktur, radyasyon yüksektir."},
+ mars:{n:"Mars",sun:.45,dose:.9,info:"Mars güneşten ~%43 ışık alır ve toz fırtınaları panelleri günlerce kör edebilir. İnce atmosfer radyasyonu biraz azaltır."}};
+const M={
+ solar:{n:"Güneş paneli",c:25,max:6,d:"+14 enerji/gün (güneşliyken)"},
+ rx:{n:"Nükleer reaktör",c:70,max:3,d:"+18 enerji/gün, gece-gündüz sabit"},
+ o2:{n:"Oksijen üreteci",c:30,max:5,d:"+4 O₂/gün, 5 enerji harcar (elektroliz)"},
+ rec:{n:"Su geri dönüşümü",c:30,max:5,d:"Su kaybını azaltır, 2 enerji harcar"},
+ gh:{n:"Sera",c:40,max:5,d:"+3 gıda/gün, 6 enerji ve 2 su harcar"},
+ shield:{n:"Radyasyon kalkanı",c:35,max:5,d:"Regolit/su duvarı: dozu %20 azaltır"}};
+let S,G=30,D=1,MU=0,AX;
+function snd(f,d,ty){if(MU)return;try{AX=AX||new(window.AudioContext||window.webkitAudioContext)();const o=AX.createOscillator(),g=AX.createGain(),t=AX.currentTime;o.type=ty||"sine";o.frequency.value=f;g.gain.setValueAtTime(.08,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(AX.destination);o.start();o.stop(t+d)}catch(e){}}
+function sv(k,v){try{localStorage.setItem("uk_"+k,v)}catch(e){}}function ld(k){try{return localStorage.getItem("uk_"+k)}catch(e){return null}}
+function fin(){const sc=S.crew*200+Math.round(S.mor)+Math.round(S.mat/5),k="best_"+S.b+D,b=+ld(k)||0;S.sc=sc;S.nb=sc>b;if(S.nb)sv(k,sc);const a=[];if(S.crew==5)a.push("🏅 Kimse kaybedilmedi");if(S.dose<30)a.push("🛡️ Radyasyon ustası");if(D==2)a.push("🔥 Zor mod tamam");if(S.mod.shield>=3&&S.mod.rx>=1)a.push("⚛️ Yedekli enerji + kalkan");S.ach=a}
+function artOld(){const m=S.mod,moon=S.b=="moon";let s=`<svg viewBox="0 0 600 150" style="width:100%;max-height:170px;display:block"><rect width="600" height="150" fill="${moon?"#0b0e1f":"#3a1a12"}"/>`;for(let i=0;i<30;i++)s+=`<circle cx="${(i*97)%600}" cy="${(i*53)%70}" r="1" fill="#fff" opacity=".7"/>`;s+=`<rect y="120" width="600" height="30" fill="${moon?"#8c8f9c":"#b4532a"}"/><path d="M230 120a70 70 0 0 1 140 0z" fill="#9ec9ff" opacity=".45" stroke="#fff"/>`;for(let i=0;i<m.solar;i++)s+=`<rect x="${20+i*28}" y="105" width="22" height="10" fill="#2457d6"/><rect x="${30+i*28}" y="115" width="2" height="6" fill="#ccc"/>`;if(m.rx)s+=`<rect x="450" y="95" width="40" height="25" fill="#e0a31b"/><text x="460" y="113" font-size="14">☢</text>`;for(let i=0;i<m.gh;i++)s+=`<circle cx="${262+i*20}" cy="113" r="7" fill="#2e9e5b"/>`;for(let i=0;i<S.crew;i++)s+=`<circle cx="${265+i*18}" cy="96" r="4" fill="#fff"/>`;if(m.shield)s+=`<path d="M215 120a85 85 0 0 1 170 0" fill="none" stroke="#e0a31b" stroke-width="${m.shield*2}" opacity=".8"/>`;if(S.storm>0)s+=`<rect width="600" height="150" fill="#a0522d" opacity=".4"/>`;if(moon&&!sun())s+=`<rect width="600" height="150" fill="#000" opacity=".5"/>`;return s+"</svg>"}
+const $=s=>document.querySelector(s),R=Math.random,cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+function newGame(b){S={b,day:1,crew:5,o2:60,water:150,food:70,en:120,mat:[100,70,50][D],hist:[],dose:0,mor:80,ap:2,storm:0,
+ mod:{solar:2,rx:0,o2:1,rec:1,gh:1,shield:0},log:["Üs kuruldu. "+B[b].info],tip:B[b].info,over:0};draw()}
+function sun(){const o=B[S.b];if(S.b=="moon")return ((S.day-1)%28)<14?1:0;return S.storm>0?.08:o.sun}
+function gen(){return Math.round(14*S.mod.solar*sun()+18*S.mod.rx)}
+function use(){const m=S.mod;return S.crew*3+m.o2*5+m.rec*2+m.gh*6}
+function cost(k){return M[k].c+12*S.mod[k]}
+function act(a){if(S.ap<1||S.over)return;
+ if(a=="mat"){S.mat+=30;S.en=Math.max(0,S.en-8);S.log.unshift("⛏️ Regolit kazıldı: +30 malzeme, −8 enerji.")}
+ if(a=="ice"){S.water+=45;S.en=Math.max(0,S.en-8);S.log.unshift("🧊 Buz çıkarıldı ve eritildi: +45 su, −8 enerji.")}
+ if(a=="mor"){S.mor=cl(S.mor+18,0,100);S.log.unshift("🎮 Ekip etkinliği: moral yükseldi.")}
+ if(a=="med"){S.dose=Math.max(0,S.dose-12);S.log.unshift("🩺 Tıbbi bakım: radyasyon dozu −12.")}
+ S.ap--;snd(520,.12);draw()}
+function build(k){const c=cost(k);if(S.ap<1||S.mat<c||S.mod[k]>=M[k].max)return;S.mat-=c;S.mod[k]++;S.ap--;S.log.unshift("🔧 "+M[k].n+" seviye "+S.mod[k]+" oldu.");snd(780,.25,"triangle");draw()}
+function endDay(){if(S.over)return;const m=S.mod,L=[];
+ let av=S.en+gen();const run=n=>{if(n<=0)return 1;if(av>=n){av-=n;return 1}const f=av/n;av=0;return f};
+ const bf=run(S.crew*3),of=run(m.o2*5),rf=run(m.rec*2),gf=run(m.gh*6);
+ S.en=cl(av,0,400);
+ S.o2+=4*m.o2*of-S.crew;
+ const rate=cl(.5+.08*m.rec,0,.95)*rf;
+ S.water+=-S.crew*2*(1-rate)-m.gh*2*gf;
+ S.food+=3*m.gh*gf-S.crew;
+ S.dose+=B[S.b].dose*Math.max(.12,1-.2*m.shield);
+ S.mor-=1;
+ if(bf<1){S.mor-=10;L.push("⚡ Elektrik kesintisi! Yaşam destek sistemleri tam çalışamadı.")}
+ // olaylar
+ let tip=null;const r=R()/[.6,1,1.5][D];
+ if(r<.14){const d=Math.round(24*Math.max(.12,1-.2*m.shield));S.dose+=d;L.push("☀️ Güneş patlaması! Doz +"+d+".");tip="Güneş patlamaları (SPE) kısa sürede yüksek radyasyon getirir. Kalın regolit veya su duvarı protonları yavaşlatır; bu yüzden fırtına sığınakları kalkanlı yapılır."}
+ else if(r<.26){if(S.b=="mars"){S.storm=3;L.push("🌪️ Toz fırtınası! 3 gün güneş enerjisi neredeyse sıfır.");tip="Mars toz fırtınaları bazen haftalarca sürer ve paneller ışıksız kalır. Bu yüzden pil ve nükleer yedek enerji önemlidir (Opportunity gezgini 2018’de böyle sustu)."}
+  else{S.o2-=12;S.mat-=10;L.push("☄️ Mikrometeorit deliği: −12 O₂, −10 malzeme.");tip="Ay’da atmosfer yoktur; küçük göktaşları doğrudan yüzeye çarpar. Üs duvarları çok katmanlı ve onarılabilir tasarlanır."}}
+ else if(r<.36){const ks=Object.keys(m).filter(k=>m[k]>1);if(ks.length){const k=ks[Math.floor(R()*ks.length)];m[k]--;L.push("🛠️ Arıza: "+M[k].n+" bir seviye düştü.");tip="Uzayda yedek parça yoktur. Gerçek misyonlarda sistemler yedekli (redundant) kurulur ve ekip onarım için eğitilir."}}
+ if(S.storm>0&&!L.some(x=>x.includes("fırtına")))S.storm--;
+ if(S.b=="moon"&&(S.day%28==13)){L.push("🌑 Yarın 14 günlük Ay gecesi başlıyor: panelleri unutun, pil ve reaktör şart!");tip="Ay gecesi ~14 gün sürer ve sıcaklık −170°C’ye düşer. Kutuplardaki ‘sonsuz ışık’ tepeleri bu yüzden değerli üs adaylarıdır."}
+ // sonuçlar
+ let lost=0;
+ if(S.o2<=0){S.o2=0;lost++;L.push("😮‍💨 Oksijen bitti! Bir mürettebat kaybedildi.")}
+ if(S.water<=0){S.water=0;lost++;L.push("💧 Su bitti! Bir mürettebat kaybedildi.")}
+ if(S.food<=0){S.food=0;S.mor-=20;L.push("🍽️ Gıda yok: moral düşüyor.")}
+ if(S.dose>=100){S.dose=85;lost++;L.push("☢️ Ölümcül radyasyon dozu! Bir mürettebat kaybedildi.")}
+ if(S.mor<=0){S.mor=30;lost++;L.push("😞 Moral çöktü, bir kişi görevden ayrıldı.")}
+ S.crew-=lost;S.mor=cl(S.mor,0,100);
+ L.forEach(x=>S.log.unshift(x));if(tip)S.tip=tip;snd(L.length?160:330,L.length?.4:.15,L.length?"sawtooth":"sine");
+ S.hist.push([S.o2,S.water,S.food,S.en,S.dose]);S.day++;S.ap=2;
+ if(S.crew<=0){S.over=-1;snd(110,.8,"sawtooth")}else if(S.day>G){S.over=1;snd(988,.5,"triangle");fin()}
+ draw()}
+function pick(l,arr,cur,v){return `<p class=mu>${l}: `+arr.map(([t,x])=>`<button style="padding:4px 10px;margin-right:4px;${x==cur?"border-color:var(--ac);font-weight:700":""}" onclick="${v}=${x};draw()">${t}</button>`).join("")+"</p>"}
+function chart(){const H=S.hist,n=H.length;if(n<2)return"";const mx=[150,300,150,400,100],cs=["#3b82f6","#06b6d4","#2e9e5b","#e0a31b","#d03b3b"],nm=["O₂","Su","Gıda","Pil","Doz"],W=600,Y=120;let s=`<svg viewBox="0 0 ${W} ${Y+4}" style="width:100%;max-height:160px">`;for(let j=0;j<5;j++)s+=`<polyline fill=none stroke="${cs[j]}" stroke-width=2 points="${H.map((p,i)=>(i/(n-1)*W).toFixed(1)+","+(Y-cl(p[j]/mx[j],0,1)*Y).toFixed(1)).join(" ")}"/>`;return s+"</svg><p class=mu>"+nm.map((t,j)=>`<span style="color:${cs[j]}">● ${t}</span>`).join(" ")+"</p>"}
+function bar(l,v,mx,inv,u){const p=cl(v/mx*100,0,100),q=inv?100-p:p,c=q>50?"var(--ok)":q>25?"var(--wa)":"var(--bad)";
+ return `<div><div class=row><span>${l}</span><span>${Math.round(v)}${u||""}</span></div><div class=bar><i style="width:${p}%;background:${c}"></i></div></div>`}
+function draw(){const a=$("#app");
+ if(!S){a.innerHTML=`<h1>🚀 Uzay Üssü Komutanı</h1><p class=mu>5 kişilik ekibini ${G} gün boyunca hayatta tut. Oksijen, su, gıda, enerji ve radyasyon dengesini kur. Her gün 2 eylem hakkın var.</p>${pick("Görev süresi",[["20 gün",20],["30 gün",30],["45 gün",45]],G,"G")}${pick("Zorluk",[["Kolay",0],["Normal",1],["Zor",2]],D,"D")}<p class=mu>🏆 Rekor — Ay: ${ld("best_moon"+D)||0} · Mars: ${ld("best_mars"+D)||0}</p>
+ <div class="grid g2"><button onclick="newGame('moon')"><h2>🌙 Ay Üssü</h2><span class=mu>${B.moon.info}</span></button><button onclick="newGame('mars')"><h2>🔴 Mars Üssü</h2><span class=mu>${B.mars.info}</span></button></div>`;return}
+ const m=S.mod,g=gen(),u=use(),sn=sun();
+ let h=`<h1>${S.b=="moon"?"🌙 Ay":"🔴 Mars"} Üssü — Gün ${Math.min(S.day,G)}/${G}</h1>
+ <div class=card style="padding:0;overflow:hidden;margin-bottom:10px">${art()}</div><p class=mu>Mürettebat: <b>${S.crew}</b>/5 · Malzeme: <b>${Math.round(S.mat)}</b> · Kalan eylem: <b>${S.ap}</b> · <button style="padding:2px 8px" onclick="MU=!MU;draw()">${MU?"🔇":"🔊"}</button> · Güneş: ${sn?Math.round(sn*100)+"%":"yok (gece)"}${S.storm>0?" · 🌪️ fırtına":""}</p>`;
+ if(S.over){h+=`<div class="card" style="margin-bottom:10px"><h2>${S.over>0?"🎉 Görev başarılı!":"💀 Görev başarısız"}</h2><p>${S.over>0?`${S.crew} kişi ${G} günü tamamladı. Puan: <b>${S.sc}</b>${S.nb?" 🏆 yeni rekor!":""}<br>${(S.ach||[]).join(" · ")}`:"Tüm mürettebat kayboldu. Hangi kaynak seni zorladı? Tekrar dene!"}</p><p class=mu><b>Tartışma soruları:</b> 1) En kritik kaynak hangisiydi, neden? 2) Enerji kaybı hangi sistemleri zincirleme etkiledi? 3) Gerçek bir görevde hangi yedekleri planlardın?</p><button class=pri onclick="S=null;draw()">Yeni görev</button></div>`}
+ h+=`<div class="grid g2"><div class=card><h2>Kaynaklar</h2><div class=grid>
+ ${bar("Oksijen (O₂)",S.o2,150,0)}${bar("Su",S.water,300,0)}${bar("Gıda",S.food,150,0)}${bar("Pil (enerji)",S.en,400,0)}${bar("Radyasyon dozu",S.dose,100,1,"/100")}${bar("Moral",S.mor,100,0,"%")}</div>
+ <p class=mu>Enerji: üretim <b>${g}</b> / tüketim <b class="${g<u?"bad":"ok"}">${u}</b> (günlük)</p></div>
+ <div class=card><h2>Eylemler (2/gün)</h2><div class="grid g2">
+ <button ${S.ap<1||S.over?"disabled":""} onclick="act('mat')">⛏️ Regolit kaz<br><span class=mu>+30 malzeme, −8 enerji</span></button>
+ <button ${S.ap<1||S.over?"disabled":""} onclick="act('ice')">🧊 Buz çıkar<br><span class=mu>+45 su, −8 enerji</span></button>
+ <button ${S.ap<1||S.over?"disabled":""} onclick="act('mor')">🎮 Moral etkinliği<br><span class=mu>+18 moral</span></button>
+ <button ${S.ap<1||S.over?"disabled":""} onclick="act('med')">🩺 Tıbbi bakım<br><span class=mu>−12 radyasyon dozu</span></button></div>
+ <p><button class=pri style="width:100%" ${S.over?"disabled":""} onclick="endDay()">Günü bitir ▶</button></p></div></div>
+ <div class=card style="margin-top:10px"><h2>Modüller (inşa / yükselt)</h2><div class="grid g3">`;
+ for(const k in M){const c=cost(k),mx=m[k]>=M[k].max;h+=`<button ${S.ap<1||S.mat<c||mx||S.over?"disabled":""} onclick="build('${k}')"><b>${M[k].n}</b> · Sv ${m[k]}/${M[k].max}<br><span class=mu>${M[k].d}</span><br><span class=mu>${mx?"Maks.":"Maliyet: "+c+" malzeme"}</span></button>`}
+ h+=`</div></div><div class=card style="margin-top:10px"><h2>📈 Kaynak grafiği (gün gün)</h2>${chart()||"<p class=mu>Birkaç gün oynayınca grafik görünecek.</p>"}</div><div class="grid g2" style="margin-top:10px"><div class="card tip"><h2>💡 Biliyor muydun?</h2>${S.tip}</div><div class=card><h2>Görev günlüğü</h2><div id=log>${S.log.slice(0,25).map(x=>"<p>"+x+"</p>").join("")}</div></div></div>`;
+ a.innerHTML=h}
+draw();
+let ANG=.6,DR=null;
+function art(){return '<canvas id="c3" width="900" height="380" style="width:100%;height:auto;display:block;touch-action:none;cursor:grab"></canvas><div class=mu style="padding:4px 10px">🖱️ 3B üs görünümü: döndürmek için sürükle</div>'}
+function r3Old(c){const g=c.getContext("2d"),W=c.width,H=c.height,m=S.mod,moon=S.b=="moon",night=moon&&!sun();
+const gr=g.createLinearGradient(0,0,0,H);gr.addColorStop(0,night?"#02030a":moon?"#0b1030":"#3a1a12");gr.addColorStop(1,moon?"#2a2f4a":"#6a3020");g.fillStyle=gr;g.fillRect(0,0,W,H);g.fillStyle="#fff";for(let i=0;i<50;i++)g.fillRect((i*137)%W,(i*71)%(H*.5),1.5,1.5);
+const P=[],ca=Math.cos(ANG),sa=Math.sin(ANG),cp=Math.cos(.5),sp=Math.sin(.5);
+const T=(x,y,z)=>{const X=x*ca-z*sa,Z=x*sa+z*ca,Y=y*cp-Z*sp,Z2=y*sp+Z*cp+11,k=H*1.5/Z2;return[W/2+X*k,H*.62-Y*k,Z2]};
+const poly=(p,c,a,zz)=>{const u=[p[1][0]-p[0][0],p[1][1]-p[0][1],p[1][2]-p[0][2]],v=[p[2][0]-p[0][0],p[2][1]-p[0][1],p[2][2]-p[0][2]],n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]],l=Math.hypot(...n)||1,lum=.55+.45*Math.abs((n[0]*.4+n[1]*.8+n[2]*.4)/l),q=p.map(x=>T(...x));P.push({q,c:c.map(x=>x*lum|0),a:a||1,z:zz!==undefined?zz:q.reduce((s,x)=>s+x[2],0)/q.length})};
+const box=(x,y,z,w,h,d,c,a)=>{const X=[x-w/2,x+w/2],Y=[y,y+h],Z=[z-d/2,z+d/2],v=(i,j,k)=>[X[i],Y[j],Z[k]];[[v(0,0,0),v(1,0,0),v(1,0,1),v(0,0,1)],[v(0,1,0),v(1,1,0),v(1,1,1),v(0,1,1)],[v(0,0,0),v(1,0,0),v(1,1,0),v(0,1,0)],[v(0,0,1),v(1,0,1),v(1,1,1),v(0,1,1)],[v(0,0,0),v(0,0,1),v(0,1,1),v(0,1,0)],[v(1,0,0),v(1,0,1),v(1,1,1),v(1,1,0)]].forEach(f=>poly(f,c,a))};
+const cyl=(x,z,r,y,h,c,n=10)=>{const pt=(i,yy)=>[x+r*Math.cos(i/n*6.283),yy,z+r*Math.sin(i/n*6.283)];for(let i=0;i<n;i++)poly([pt(i,y),pt(i+1,y),pt(i+1,y+h),pt(i,y+h)],c);poly(Array.from({length:n},(_,i)=>pt(i,y+h)),c)};
+poly(Array.from({length:28},(_,i)=>[8*Math.cos(i/28*6.283),0,8*Math.sin(i/28*6.283)]),moon?[150,152,166]:[190,90,52],1,1e3);
+cyl(0,0,3.3,0,.08,[205,205,215],20);
+for(let i=0;i<S.crew;i++)cyl(1.3*Math.cos(i*1.26),1.3*Math.sin(i*1.26),.13,.08,.45,[255,255,255],6);
+for(let i=0;i<m.gh;i++)box(-4.6,0,-2.2+i*1.05,1.4,.7,.9,[46,158,91],.92);
+for(let i=0;i<m.solar;i++){const x=-4+i*1.5;cyl(x,4.6,.05,0,.5,[200,200,215],4);box(x,.5,4.6,1.2,.06,.9,[36,87,214])}
+for(let i=0;i<m.rx;i++)cyl(6,-1.5+i*1.3,.55,0,1.2+.3*m.rx,[224,163,27],10);
+for(let i=0;i<m.o2;i++)cyl(-6.2,-3+i*.7,.28,0,1+.15*i,[235,235,245],8);
+for(let i=0;i<m.rec;i++)cyl(-6.2,1.2+i*.7,.28,0,.6,[60,140,230],8);
+if(m.shield)for(let i=0;i<18;i++){const a=i/18*6.283;box(3.7*Math.cos(a),0,3.7*Math.sin(a),.75,.15+.25*m.shield,.6,[222,150,50])}
+const L=4,N=14,dp=(i,j)=>{const a=j/N*6.283,b=i/L*1.5708;return[3*Math.cos(b)*Math.cos(a),3*Math.sin(b),3*Math.cos(b)*Math.sin(a)]};for(let i=0;i<L;i++)for(let j=0;j<N;j++)poly([dp(i,j),dp(i,j+1),dp(i+1,j+1),dp(i+1,j)],[150,210,255],.28,-50);
+P.sort((a,b)=>b.z-a.z);P.forEach(o=>{g.beginPath();o.q.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.fillStyle=`rgba(${o.c[0]},${o.c[1]},${o.c[2]},${o.a})`;g.fill();if(o.a>.5){g.strokeStyle="rgba(0,0,0,.25)";g.lineWidth=1;g.stroke()}});
+if(S.storm>0){g.fillStyle="rgba(160,82,45,.35)";g.fillRect(0,0,W,H)}if(night){g.fillStyle="rgba(0,0,10,.45)";g.fillRect(0,0,W,H)}}
+function r3(c){const g=c.getContext("2d"),W=c.width,H=c.height,m=S.mod,moon=S.b=="moon",night=moon&&!sun();
+const gr=g.createLinearGradient(0,0,0,H);gr.addColorStop(0,night?"#02030a":moon?"#0b1030":"#3a1a12");gr.addColorStop(1,moon?"#2a2f4a":"#6a3020");g.fillStyle=gr;g.fillRect(0,0,W,H);g.fillStyle="#fff";for(let i=0;i<50;i++)g.fillRect((i*137)%W,(i*71)%(H*.4),1.5,1.5);
+const P=[],A=[],ca=Math.cos(ANG),sa=Math.sin(ANG),cp=Math.cos(.42),sp=Math.sin(.42);
+const T=(x,y,z)=>{const X=x*ca-z*sa,Z=x*sa+z*ca,Y=y*cp+Z*sp,Z2=Z*cp-y*sp+17,k=H*1.7/Z2;return[W/2+X*k,H*.58-Y*k,Z2]};
+const poly=(p,c,a,zz)=>{const u=[p[1][0]-p[0][0],p[1][1]-p[0][1],p[1][2]-p[0][2]],v=[p[2][0]-p[0][0],p[2][1]-p[0][1],p[2][2]-p[0][2]],n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]],l=Math.hypot(...n)||1,lum=.55+.45*Math.abs((n[0]*.4+n[1]*.8+n[2]*.4)/l),q=p.map(x=>T(...x));P.push({q,c:c.map(x=>x*lum|0),a:a||1,z:zz!==undefined?zz+.01*q.reduce((s,x)=>s+x[2],0)/q.length:q.reduce((s,x)=>s+x[2],0)/q.length})};
+const box=(x,y,z,w,h,d,c,a,zz)=>{const X=[x-w/2,x+w/2],Y=[y,y+h],Z=[z-d/2,z+d/2],v=(i,j,k)=>[X[i],Y[j],Z[k]];[[v(0,0,0),v(1,0,0),v(1,0,1),v(0,0,1)],[v(0,1,0),v(1,1,0),v(1,1,1),v(0,1,1)],[v(0,0,0),v(1,0,0),v(1,1,0),v(0,1,0)],[v(0,0,1),v(1,0,1),v(1,1,1),v(0,1,1)],[v(0,0,0),v(0,0,1),v(0,1,1),v(0,1,0)],[v(1,0,0),v(1,0,1),v(1,1,1),v(1,1,0)]].forEach(f=>poly(f,c,a,zz))};
+const cyl=(x,z,r,y,h,c,n=12,zz,nt)=>{const pt=(i,yy)=>[x+r*Math.cos(i/n*6.283),yy,z+r*Math.sin(i/n*6.283)];for(let i=0;i<n;i++)poly([pt(i,y),pt(i+1,y),pt(i+1,y+h),pt(i,y+h)],c,1,zz);if(!nt)poly(Array.from({length:n},(_,i)=>pt(i,y+h)),c,1,zz)};
+const human=(x,z,c)=>{const f=v=>v*1.55,zc=T(x,.4,z)[2];for(const d of[-1,1])box(x+d*f(.06),0,z,f(.09),f(.32),f(.1),[205,210,225],1,zc+.08);box(x,f(.32),z,f(.26),f(.34),f(.16),c,1,zc+.06);for(const d of[-1,1])box(x+d*f(.17),f(.32),z,f(.07),f(.3),f(.08),c,1,zc+.05);cyl(x,z,f(.12),f(.66),f(.2),[245,245,250],10,zc);cyl(x,z,f(.13),f(.7),f(.09),[40,110,200],10,zc-.02,1)};
+const lab=(t,x,y,z)=>A.push([t,x,y,z]);
+poly(Array.from({length:32},(_,i)=>[9*Math.cos(i/32*6.283),0,9*Math.sin(i/32*6.283)]),moon?[150,152,166]:[190,90,52],1,1e3);
+poly(Array.from({length:24},(_,i)=>[3.4*Math.cos(i/24*6.283),.02,3.4*Math.sin(i/24*6.283)]),[205,205,215],1,900);
+box(-4.2,0,0,3,.45,.7,[175,178,190]);box(-1.6,0,4.3,.7,.45,2.2,[175,178,190]);box(4.6,0,0,2.6,.12,.25,[60,60,70]);
+const SC=[[245,245,250],[255,170,90],[130,190,255],[160,225,160],[255,225,120]];for(let i=0;i<S.crew;i++)human(1.6*Math.cos(i*1.26),1.6*Math.sin(i*1.26),SC[i%5]);
+for(let i=0;i<m.gh;i++){const z=-1.1*(m.gh-1)/2+i*1.1;box(-6.2,0,z,1.9,.9,.95,[46,158,91]);box(-6.2,.9,z,1.7,.18,.8,[130,215,150])}
+for(let i=0;i<m.solar;i++){const x=-3.3+i*1.3;cyl(x,-6.2,.06,0,.55,[200,200,215],5);poly([[x-.6,.8,-6.5],[x+.6,.8,-6.5],[x+.6,.5,-5.9],[x-.6,.5,-5.9]],[36,87,214])}
+for(let i=0;i<m.rx;i++){const z=(i-(m.rx-1)/2)*1.5;cyl(6.4,z,.65,0,1.8,[224,163,27]);cyl(6.4,z,.35,1.8,.35,[210,50,40])}
+for(let i=0;i<m.o2;i++){const x=-3.2+i*.8;cyl(x,5.4,.32,0,1.5,[238,238,248],10);cyl(x,5.4,.34,1.5,.22,[60,120,220],10)}
+for(let i=0;i<m.rec;i++)cyl(4.6+i*.75,-3.6,.36,0,.9,[70,150,235],10);
+if(m.shield)for(let i=0;i<22;i++){const a=i/22*6.283;if(Math.abs(Math.cos(a))>.94||Math.abs(a-1.93)<.2)continue;box(4.2*Math.cos(a),0,4.2*Math.sin(a),.85,.12+.17*m.shield,.7,[200,122,62])}
+const L=5,N=16,dp=(i,j)=>{const a=j/N*6.283,b=i/L*1.5708;return[3*Math.cos(b)*Math.cos(a),3*Math.sin(b),3*Math.cos(b)*Math.sin(a)]};for(let i=0;i<L;i++)for(let j=0;j<N;j++)poly([dp(i,j),dp(i,j+1),dp(i+1,j+1),dp(i+1,j)],[150,210,255],.3,-50);
+lab("🏠 Yaşam kubbesi · "+S.crew+" kişi",0,3.4,0);
+if(m.gh)lab("🌱 Sera ×"+m.gh,-6.2,1.5,0);if(m.solar)lab("☀️ Güneş paneli ×"+m.solar,0,1.3,-6.3);if(m.rx)lab("☢️ Reaktör ×"+m.rx,6.4,2.7,0);
+if(m.o2)lab("💨 O₂ üreteci ×"+m.o2,-1.6,2.4,5.4);if(m.rec)lab("💧 Su geri dönüşümü ×"+m.rec,5.4,1.7,-3.6);
+if(m.shield)lab("🛡️ Radyasyon kalkanı Sv"+m.shield,4.2*Math.cos(-2.3),.8+.17*m.shield,4.2*Math.sin(-2.3));
+P.sort((a,b)=>b.z-a.z);P.forEach(o=>{g.beginPath();o.q.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();g.fillStyle=`rgba(${o.c[0]},${o.c[1]},${o.c[2]},${o.a})`;g.fill();if(o.a>.5){g.strokeStyle="rgba(0,0,0,.25)";g.lineWidth=1;g.stroke()}});
+if(S.storm>0){g.fillStyle="rgba(160,82,45,.35)";g.fillRect(0,0,W,H)}if(night){g.fillStyle="rgba(0,0,10,.45)";g.fillRect(0,0,W,H)}
+g.font="bold 15px system-ui,sans-serif";g.textAlign="center";A.forEach(([t,x,y,z])=>{const q=T(x,y,z),w=g.measureText(t).width+14;g.fillStyle="rgba(10,14,40,.82)";g.fillRect(q[0]-w/2,q[1]-17,w,24);g.fillStyle="#fff";g.fillText(t,q[0],q[1])})}
+function loop(){const c=document.getElementById("c3");if(c&&S){if(DR==null)ANG+=.004;r3(c)}requestAnimationFrame(loop)}
+addEventListener("pointerdown",e=>{if(e.target.id=="c3")DR=e.clientX});addEventListener("pointermove",e=>{if(DR!=null){ANG+=(e.clientX-DR)*.01;DR=e.clientX}});addEventListener("pointerup",()=>{DR=null});loop();
+try{if(location.protocol.indexOf("http")==0&&navigator.serviceWorker)navigator.serviceWorker.register("sw.js")}catch(e){}
+</script></body></html>
